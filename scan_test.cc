@@ -1,25 +1,14 @@
 
 #include "scan.h"
+#include "test.h"
 
 #include <cstdio>
 #include <sstream>
-#include <vector>
-#include <utility> // std::function
-#include <map>
 
-struct InputScannerTestResults {
-public:
-	std::map<const std::string, bool> results;
-};
-
-class InputScannerTest {
+class InputScannerTest : public Test {
 public:
 	InputScannerTest();
-	InputScannerTestResults test();
 private:
-	// vector of test functions
-	std::map<std::string, std::function<bool()>> tests;
-
 	// test functions
 	static bool next();
 	static bool back();
@@ -37,22 +26,11 @@ InputScannerTest::InputScannerTest() {
 	};
 }
 
-InputScannerTestResults InputScannerTest::test() {
-	InputScannerTestResults results{};
-
-	// iterate through test mapping and store result in result mapping.
-	for (auto i = tests.begin(); i != tests.end(); i++) {
-		results.results[i->first] = i->second();
-	}
-
-	return results;
-}
-
 bool InputScannerTest::next() {
 	std::string test{"hello"};
 	std::stringstream ss{test};
 	Crisp::InputScanner scanner(&ss);
-	
+
 	for (auto i = test.begin(); i != test.end(); i++) {
 		if (scanner.next() != *i) {
 			return false;
