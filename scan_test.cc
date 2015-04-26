@@ -10,7 +10,7 @@ public:
 	InputScannerTest() {
 		// create mapping of test description to test function.
 		tests = {
-			{"Next", []{
+			{"Next Reads a Stream & EOFs", []{
 				std::string test{"hello"};
 				std::stringstream ss{test};
 				Crisp::InputScanner scanner(&ss);
@@ -28,7 +28,16 @@ public:
 				return true;
 			}},
 
-			{"Back", []{
+			{"Back Updates Empty", []{
+				std::stringstream ss{};
+				Crisp::InputScanner scanner(&ss);
+
+				ss.get(); // eof
+
+				if (!scanner.empty()) {
+					return false;
+				}
+
 				return true;
 			}},
 
@@ -57,16 +66,28 @@ public:
 };
 
 int main() {
+	char name[30];
 	InputScannerTest test;
 	auto res = test.test();
+
 	int success = 0, failure = 0;
+	char fmtfit[20], fmtlong[20];
+	sprintf(fmtfit, "%%-%lu.%lus", (sizeof(name) - 1), (sizeof(name) - 1));
+	sprintf(fmtlong, "%%-%lu.%lus...", (sizeof(name) - 1 - 3), (sizeof(name) - 1 - 3));
+
 	for (auto i = res.begin(); i != res.end(); i++) {
 
 		if (i->second) {
 			success++;
 		} else { failure++; }
 
-		printf("%-20.20s %s\n", i->first.c_str(), i->second ? "\033[1;32mSuccess\033[0m" : "\033[1;31mFailure\033[0m");
+		if (i->first.length() <= (sizeof(name) - 1)) {
+			sprintf(name, fmtfit, i->first.c_str());
+		} else {
+			sprintf(name, fmtlong, i->first.c_str());
+		}
+
+		printf("%s %s\n", name, i->second ? "\033[1;32mSuccess\033[0m" : "\033[1;31mFailure\033[0m");
 	}
 	printf("%.2f%% success\n", ((float) success/(success + failure)) * 100);
 }
