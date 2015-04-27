@@ -19,9 +19,9 @@ public:
 	virtual Token *Next() = 0;
 };
 
-struct State {
+struct SharedStateData {
 public:
-	State(ScannerInterface *s) : scanner(s) {}
+	SharedStateData(ScannerInterface *s) : scanner(s) {}
 
 	int paren_depth = 0;
 	Position pos; // current token origin position.
@@ -39,47 +39,47 @@ public:
 
 class Ident : public StateInterface {
 public:
-	Ident(State *state): s(state) {}
+	Ident(SharedStateData *state): s(state) {}
 	virtual StateInterface *Next();
 private:
-	State *s;
+	SharedStateData *s;
 };
 
 class Num : public StateInterface {
 public:
-	Num(State *state): s(state) {}
+	Num(SharedStateData *state): s(state) {}
 	virtual StateInterface *Next();
 private:
-	State *s;
+	SharedStateData *s;
 };
 
 class Tick : public StateInterface {
 public:
-	Tick(State *state): s(state) {}
+	Tick(SharedStateData *state): s(state) {}
 	virtual StateInterface *Next();
 private:
-	State *s;
+	SharedStateData *s;
 };
 
 class SExpressionDelim : public StateInterface {
 public:
-	SExpressionDelim(State *state): s(state) {}
+	SExpressionDelim(SharedStateData *state): s(state) {}
 	virtual StateInterface *Next();
 private:
-	State *s;
+	SharedStateData *s;
 };
 
 class SExpression : public StateInterface {
 public:
-	SExpression(State *state): s(state) {}
+	SExpression(SharedStateData *state): s(state) {}
 	virtual StateInterface *Next();
 private:
-	State *s;
+	SharedStateData *s;
 };
 
 class Whitespace : public StateInterface {
 public:
-	Whitespace(State *state, StateInterface *nextstate) :
+	Whitespace(SharedStateData *state, StateInterface *nextstate) :
 		s(state), next(nextstate) {}
 	static bool Is(char c) {
 		// whitespace character
@@ -87,26 +87,26 @@ public:
 	}
 	virtual StateInterface *Next();
 private:
-	State *s;
+	SharedStateData *s;
 	StateInterface *next;
 };
 
 class Comment : public StateInterface {
 public:
-	Comment(State *state, StateInterface *nextstate) :
+	Comment(SharedStateData *state, StateInterface *nextstate) :
 		s(state), next(nextstate) {}
 	virtual StateInterface *Next();
 private:
-	State *s;
+	SharedStateData *s;
 	StateInterface *next;
 };
 
 class Start : public StateInterface {
 public:
-	Start(State *state): s(state) {}
+	Start(SharedStateData *state): s(state) {}
 	virtual StateInterface *Next();
 private:
-	State *s;
+	SharedStateData *s;
 };
 
 class StateMachine {
@@ -117,7 +117,7 @@ public:
 	}
 	Token *Next();
 private:
-	State s;
+	SharedStateData s;
 	StateInterface *state;
 };
 
