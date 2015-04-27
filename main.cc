@@ -35,5 +35,6 @@ int main() {
 
 	while ((tok = lex.Next()) != nullptr) {
 		printf("lexeme@%d:%d-> %-10s as %s\n", tok->pos().linenum + 1, tok->pos().chnum, ("'" + tok->lexeme() + "'").c_str(), tcstr(tok->category()).c_str());
+		delete tok;
 	}
 }

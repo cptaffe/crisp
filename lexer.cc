@@ -13,111 +13,7 @@ using namespace crisp;
 
 Lexer::Lexer(ScannerInterface *s) : mach(s) {}
 
-namespace {
-
-inline bool iswhitespace(char c) {
-	// whitespace character or comment delimitor
-	return c == ' ' || c == '\t' || c == '\n';
-}
-
-void *whitespace_start_state(State *s);
-void *whitespace_sexp_state(State *s);
-void *sexp_delim_state(State *s);
-void *sexp_state(State *s);
-void *id_state(State *s);
-void *num_state(State *s);
-void *tick_state(State *s);
-
-// lex whitespace
-void whitespace(State *s) {
-	char c = s->scanner->Next();
-	while (iswhitespace((c = s->scanner->Next()))) {
-		// dump whitespace
-	}
-	s->scanner->Back(c);
-}
-
-void comment(State *s) {
-	char c = s->scanner->Next();
-	s->pos = s->scanner->pos();
-	// lex #stuffstuff\n comment,
-	// don't save delimiter '#' character
-	while ((c = s->scanner->Next()) != '\n') {
-		s->buf.push_back(c);
-	}
-	s->toks.push(new Token(Token::kComment, s->pos, s->buf));
-	s->buf.clear();
-}
-
-void *whitespace_start_state(State *s) {
-	whitespace(s);
-	return (void *) start_state;
-}
-
-void *comment_start_state(State *s) {
-	comment(s);
-	return (void *) start_state;
-}
-
-void *whitespace_sexp_state(State *s) {
-	whitespace(s);
-	return (void *) sexp_state;
-}
-
-void *comment_sexp_state(State *s) {
-	comment(s);
-	return (void *) sexp_state;
-}
-
-void *sexp_delim_state(State *s) {
-	char c = s->scanner->Next();
-	if (c == '(') {
-		s->toks.push(new Token(Token::kBeginParen, s->scanner->pos(), std::string(1, c)));
-		s->paren_depth++;
-		return (void *) sexp_state;
-	} else if (c == ')') {
-		s->toks.push(new Token(Token::kEndParen, s->scanner->pos(), std::string(1, c)));
-		s->paren_depth--;
-		if (s->paren_depth > 0) {
-			return (void *) sexp_state;
-		} else {
-			return (void *) start_state;
-		}
-		return NULL;
-	} else {
-		// should never reach
-		return NULL;
-	}
-}
-
-void *sexp_state(State *s) {
-	char c = s->scanner->Peek();
-	if (c == '(' || c == ')') {
-		return (void *) sexp_delim_state;
-	} else if (iswhitespace(c)) {
-		return (void *) whitespace_sexp_state;
-	} else if (c == '#') {
-		return (void *) comment_sexp_state;
-	} else if (isalpha(c)) {
-		return (void *) id_state;
-	} else if (c >= '0' && c <= '9') {
-		return (void *) num_state;
-	} else if (c == '\'') {
-		return (void *) tick_state;
-	} else if (c == EOF) {
-		std::stringstream str;
-		str << "unexpected EOF";
-		s->toks.push(new Token(Token::kError, s->scanner->pos(), str.str()));
-		return NULL;
-	} else {
-		std::stringstream str;
-		str << "unexpected character '" << c << "'";
-		s->toks.push(new Token(Token::kError, s->scanner->pos(), str.str()));
-		return NULL;
-	}
-}
-
-void *id_state(State *s) {
+StateInterface *Ident::Next() {
 	char c = s->scanner->Next();
 	s->pos = s->scanner->pos();
 	s->buf.push_back(c);
@@ -127,10 +23,10 @@ void *id_state(State *s) {
 	s->scanner->Back(c);
 	s->toks.push(new Token(Token::kIdent, s->pos, s->buf));
 	s->buf.clear();
-	return (void *) sexp_state;
+	return new SExpression(s);
 }
 
-void *num_state(State *s) {
+StateInterface *Num::Next() {
 	char c = s->scanner->Next();
 	s->pos = s->scanner->pos();
 	s->buf.push_back(c);
@@ -140,44 +36,113 @@ void *num_state(State *s) {
 	s->scanner->Back(c);
 	s->toks.push(new Token(Token::kNum, s->pos, s->buf));
 	s->buf.clear();
-	return (void *) sexp_state;
+	return new SExpression(s);
 }
 
-void *tick_state(State *s) {
+StateInterface *Tick::Next() {
 	char c = s->scanner->Next();
 	s->toks.push(new Token(Token::kTick, s->scanner->pos(), std::string(1, c)));
-	return (void *) sexp_state;
+	return new SExpression(s);
 }
 
-} // namespace
+StateInterface *SExpressionDelim::Next() {
+	char c = s->scanner->Next();
+	if (c == '(') {
+		s->toks.push(new Token(Token::kBeginParen, s->scanner->pos(), std::string(1, c)));
+		s->paren_depth++;
+		return new SExpression(s);
+	} else if (c == ')') {
+		s->toks.push(new Token(Token::kEndParen, s->scanner->pos(), std::string(1, c)));
+		s->paren_depth--;
+		if (s->paren_depth > 0) {
+			return new SExpression(s);
+		} else {
+			return new Start(s);
+		}
+		return nullptr;
+	} else {
+		// should never reach
+		return nullptr;
+	}
+}
 
-// start state is exported
-void *crisp::start_state(State *s) {
+StateInterface *SExpression::Next() {
 	char c = s->scanner->Peek();
-	if (iswhitespace(c)) {
-		return (void *) whitespace_start_state;
+	if (c == '(' || c == ')') {
+		return new SExpressionDelim(s);
+	} else if (Whitespace::Is(c)) {
+		return new Whitespace(s, new SExpression(s));
 	} else if (c == '#') {
-		return (void *) comment_sexp_state;
-	} else if (c == '(') {
-		return (void *) sexp_delim_state;
+		return new Comment(s, new SExpression(s));;
+	} else if (isalpha(c)) {
+		return new Ident(s);
+	} else if (c >= '0' && c <= '9') {
+		return new Num(s);
+	} else if (c == '\'') {
+		return new Tick(s);
 	} else if (c == EOF) {
-		return NULL;
+		std::stringstream str;
+		str << "unexpected EOF";
+		s->toks.push(new Token(Token::kError, s->scanner->pos(), str.str()));
+		return nullptr;
+	} else {
+		std::stringstream str;
+		str << "unexpected character '" << c << "'";
+		s->toks.push(new Token(Token::kError, s->scanner->pos(), str.str()));
+		return nullptr;
+	}
+}
+
+StateInterface *Whitespace::Next() {
+	char c = s->scanner->Next();
+	while (Is((c = s->scanner->Next()))) {
+		// dump whitespace
+	}
+	s->scanner->Back(c);
+	return next;
+}
+
+StateInterface *Comment::Next() {
+	char c = s->scanner->Next();
+	s->pos = s->scanner->pos();
+	// lex #stuffstuff\n comment,
+	// don't save delimiter '#' character
+	while ((c = s->scanner->Next()) != '\n') {
+		s->buf.push_back(c);
+	}
+	s->toks.push(new Token(Token::kComment, s->pos, s->buf));
+	s->buf.clear();
+	return next;
+}
+
+StateInterface *Start::Next() {
+	char c = s->scanner->Peek();
+	if (Whitespace::Is(c)) {
+		return new Whitespace(s, new Start(s));
+	} else if (c == '#') {
+		return new Comment(s, new Start(s));
+	} else if (c == '(') {
+		return new SExpressionDelim(s);
+	} else if (c == EOF) {
+		return nullptr;
 	} else {
 		s->scanner->Next();
 		std::stringstream str;
 		str << "unexpected character '" << c << "'";
 		s->toks.push(new Token(Token::kError, s->scanner->pos(), str.str()));
-		return NULL;
+		return nullptr;
 	}
 }
 
 Token *StateMachine::Next() {
-	while (func != NULL && state.toks.empty()) {
-		func = StateFunc(func(&state));
+	while (state != nullptr && s.toks.empty()) {
+		StateInterface *next_state = state->Next();
+		delete state;
+		state = next_state;
 	}
-	if (!state.toks.empty()) {
-		Token *tok = state.toks.top(); // has tokens.
-		state.toks.pop();
+	if (!s.toks.empty()) {
+		Token *tok = s.toks.top(); // has tokens.
+		s.toks.pop();
 		return tok;
 	} else {
 		return nullptr;

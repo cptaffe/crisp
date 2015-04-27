@@ -30,16 +30,95 @@ public:
 	ScannerInterface *scanner;
 };
 
-typedef void *(* StateFunc)(State *);
-void *start_state(State *s);
+class StateInterface {
+public:
+	virtual ~StateInterface() {}
+	// run state and get next state.
+	virtual StateInterface *Next() = 0;
+};
+
+class Ident : public StateInterface {
+public:
+	Ident(State *state): s(state) {}
+	virtual StateInterface *Next();
+private:
+	State *s;
+};
+
+class Num : public StateInterface {
+public:
+	Num(State *state): s(state) {}
+	virtual StateInterface *Next();
+private:
+	State *s;
+};
+
+class Tick : public StateInterface {
+public:
+	Tick(State *state): s(state) {}
+	virtual StateInterface *Next();
+private:
+	State *s;
+};
+
+class SExpressionDelim : public StateInterface {
+public:
+	SExpressionDelim(State *state): s(state) {}
+	virtual StateInterface *Next();
+private:
+	State *s;
+};
+
+class SExpression : public StateInterface {
+public:
+	SExpression(State *state): s(state) {}
+	virtual StateInterface *Next();
+private:
+	State *s;
+};
+
+class Whitespace : public StateInterface {
+public:
+	Whitespace(State *state, StateInterface *nextstate) :
+		s(state), next(nextstate) {}
+	static bool Is(char c) {
+		// whitespace character
+		return c == ' ' || c == '\t' || c == '\n';
+	}
+	virtual StateInterface *Next();
+private:
+	State *s;
+	StateInterface *next;
+};
+
+class Comment : public StateInterface {
+public:
+	Comment(State *state, StateInterface *nextstate) :
+		s(state), next(nextstate) {}
+	virtual StateInterface *Next();
+private:
+	State *s;
+	StateInterface *next;
+};
+
+class Start : public StateInterface {
+public:
+	Start(State *state): s(state) {}
+	virtual StateInterface *Next();
+private:
+	State *s;
+};
 
 class StateMachine {
 public:
-	StateMachine(ScannerInterface *s) : state(s) {}
+	StateMachine(ScannerInterface *scanner) : s(scanner), state(new Start(&s)) {}
+	~StateMachine() {
+		delete state;
+	}
 	Token *Next();
 private:
-	StateFunc func = &start_state;
-	State state;
+	State s;
+	StateInterface *state;
 };
 
 class Lexer : public LexerInterface {
