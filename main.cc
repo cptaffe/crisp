@@ -1,5 +1,7 @@
 
 #include "lexer.h"
+#include "channel.h"
+#include "tree.h"
 
 #include <sstream>
 #include <cstdio>
