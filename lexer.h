@@ -24,6 +24,7 @@ public:
 	State(ScannerInterface *s) : scanner(s) {}
 
 	int paren_depth = 0;
+	Position pos; // current token origin position.
 	std::string buf;
 	std::stack<Token *> toks;
 	ScannerInterface *scanner;

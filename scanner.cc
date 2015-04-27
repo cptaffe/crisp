@@ -33,6 +33,8 @@ char InputScanner::Next() {
 		// line number rollover
 		pos_.chnum = 0;
 		pos_.linenum++;
+	} else {
+		pos_.chnum++;
 	}
 	return next_char;
 }
@@ -43,6 +45,8 @@ void InputScanner::Back(char c) {
 		// so chnum is reset to 0 and linenum is decremented.
 		pos_.chnum = 0;
 		pos_.linenum--;
+	} else {
+		pos_.chnum--;
 	}
 	backstack.push(c);
 }

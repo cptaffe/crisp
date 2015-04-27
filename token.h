@@ -21,6 +21,8 @@ public:
 		kIdent,
 		kNum,
 		kString,
+		kTick,
+		kComment,
 		kError,
 	};
 
