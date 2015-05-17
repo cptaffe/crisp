@@ -40,6 +40,14 @@ public:
 class Ident : public StateInterface {
 public:
 	Ident(SharedStateData *state): s(state) {}
+	// is initial character of ident
+	static bool IsDelim(char c) {
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+	}
+	// is ident character
+	static bool Is(char c) {
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+	}
 	virtual StateInterface *Next();
 private:
 	SharedStateData *s;
@@ -48,6 +56,14 @@ private:
 class Num : public StateInterface {
 public:
 	Num(SharedStateData *state): s(state) {}
+	// initial character for a number
+	static bool IsDelim(char c) {
+		return (c >= '0' && c <= '9') || c == '+' || c == '-';
+	}
+	// is a numeric character
+	static bool Is(char c) {
+		return (c >= '0' && c <= '9') || c == '_';
+	}
 	virtual StateInterface *Next();
 private:
 	SharedStateData *s;
@@ -81,6 +97,7 @@ class Whitespace : public StateInterface {
 public:
 	Whitespace(SharedStateData *state, StateInterface *nextstate) :
 		s(state), next(nextstate) {}
+	// is a whitespae character
 	static bool Is(char c) {
 		// whitespace character
 		return c == ' ' || c == '\t' || c == '\n';
@@ -95,6 +112,10 @@ class Comment : public StateInterface {
 public:
 	Comment(SharedStateData *state, StateInterface *nextstate) :
 		s(state), next(nextstate) {}
+	// initial comment character
+	static bool IsDelim(char c) {
+		return c == '#';
+	}
 	virtual StateInterface *Next();
 private:
 	SharedStateData *s;
