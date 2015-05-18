@@ -11,6 +11,8 @@
 
 using namespace crisp;
 
+const std::string crisp::Ident::legal = "+-*/`~!@#$%^&*_=|?\\;:<>,.";
+
 Lexer::Lexer(ScannerInterface *s) : mach(s) {}
 
 StateInterface *Ident::Next() {

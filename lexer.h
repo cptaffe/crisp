@@ -48,15 +48,16 @@ public:
 	Ident(SharedStateData *state): s(state) {}
 	// is initial character of ident
 	static bool IsDelim(char c) {
-		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+		return Is(c);
 	}
 	virtual StateInterface *Next();
 private:
 	// is ident character
 	static bool Is(char c) {
-		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || legal.find(c) != std::string::npos;
 	}
 
+	static const std::string legal;
 	SharedStateData *s;
 };
 
@@ -66,7 +67,7 @@ public:
 
 	// initial character for a number
 	static bool IsDelim(char c) {
-		return (c >= '0' && c <= '9') || c == '+' || c == '-';
+		return (c >= '0' && c <= '9');
 	}
 
 	virtual StateInterface *Next();

@@ -18,13 +18,6 @@ public:
 	Parser() {
 		path.push_back(new RootNode());
 	}
-	~Parser() {
-		if (!path.empty()) {
-			std::cout << ">> ";
-			path.front()->PPrint(std::cout);
-			std::cout << std::endl;
-		}
-	}
 
 	void Put(Token *tok) {
 
@@ -36,7 +29,7 @@ public:
 			paren_count++;
 			auto list = new ListNode(tok, constant);
 			if (!path.empty()) {
-				static_cast<ParentNodeInterface *>(path.back())->Put(list);
+				static_cast<ParentNode *>(path.back())->Put(list);
 			}
 			path.push_back(list); // descend tree
 		} else if (tok->GetCategory() == Token::kEndParen) {
@@ -48,6 +41,7 @@ public:
 			} else {
 				path.pop_back(); // ascend tree
 			}
+			delete tok; // not used
 		} else if (tok->GetCategory() == Token::kEndAllParen) {
 			paren_count = 0;
 			NodeInterface *node = path.front();
@@ -59,13 +53,19 @@ public:
 		} else if (tok->GetCategory() == Token::kComment) {
 			// throw away comment.
 			std::cout << "tossing comment: '" << tok->GetLexeme() << "'" << std::endl;
+		} else if (tok->GetCategory() == Token::kError) {
+			// print error, attempt recovery (via ignoring).
+			std::cout << "Error: " << tok->GetLexeme() << std::endl;
 		} else {
-			if (!path.empty()) {
-				static_cast<ParentNodeInterface *>(path.back())->Put(NodeFactory::GetInstance()->CreateNode(tok, constant));
-			} else {
-				// unexpected token error.
-				std::cout << "Unexpected Token '" << tok->String() << "' containing \"" << tok->GetLexeme() << "\"" << std::endl;
-			}
+			static_cast<ParentNode *>(path.back())->Put(NodeFactory::GetInstance()->CreateNode(tok, constant));
+		}
+	}
+
+	NodeInterface *GetTree() const {
+		if (!path.empty()) {
+			return path[0];
+		} else {
+			return nullptr;
 		}
 	}
 private:
