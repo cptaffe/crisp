@@ -18,6 +18,7 @@ public:
 	enum TokenCategory {
 		kBeginParen,
 		kEndParen,
+		kEndAllParen,
 		kIdent,
 		kNum,
 		kString,
@@ -27,6 +28,9 @@ public:
 	};
 
 	Token(const enum TokenCategory c, const Position p, const std::string l);
+
+	// returns token as string
+	std::string String() const;
 
 	std::string lexeme() const;
 	enum TokenCategory category() const;

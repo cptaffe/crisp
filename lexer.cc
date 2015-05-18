@@ -16,10 +16,9 @@ Lexer::Lexer(ScannerInterface *s) : mach(s) {}
 StateInterface *Ident::Next() {
 	char c = s->scanner->Next();
 	s->pos = s->scanner->pos();
-	s->buf.push_back(c);
-	while ((isalnum((c = s->scanner->Next())) || c == '_') && c != EOF) {
+	do {
 		s->buf.push_back(c);
-	}
+	} while (Is((c = s->scanner->Next())) && c != EOF);
 	s->scanner->Back(c);
 	s->toks.push(new Token(Token::kIdent, s->pos, s->buf));
 	s->buf.clear();
@@ -29,10 +28,9 @@ StateInterface *Ident::Next() {
 StateInterface *Num::Next() {
 	char c = s->scanner->Next();
 	s->pos = s->scanner->pos();
-	s->buf.push_back(c);
-	while ((((c = s->scanner->Next()) >= '0' && c <= '9') || c == '.') && c != EOF) {
+	do {
 		s->buf.push_back(c);
-	}
+	} while (Is((c = s->scanner->Next())) && c != EOF);
 	s->scanner->Back(c);
 	s->toks.push(new Token(Token::kNum, s->pos, s->buf));
 	s->buf.clear();
@@ -59,7 +57,10 @@ StateInterface *SExpressionDelim::Next() {
 		} else {
 			return new Start(s);
 		}
-		return nullptr;
+	} else if (c == ']') {
+		s->toks.push(new Token(Token::kEndAllParen, s->scanner->pos(), std::string(1, c)));
+		s->paren_depth = 0;
+		return new Start(s);
 	} else {
 		// should never reach
 		return nullptr;
@@ -68,18 +69,20 @@ StateInterface *SExpressionDelim::Next() {
 
 StateInterface *SExpression::Next() {
 	char c = s->scanner->Peek();
-	if (c == '(' || c == ')') {
+	if (SExpressionDelim::IsDelim(c)) {
 		return new SExpressionDelim(s);
-	} else if (Whitespace::Is(c)) {
+	} else if (Whitespace::IsDelim(c)) {
 		return new Whitespace(s, new SExpression(s));
-	} else if (c == '#') {
-		return new Comment(s, new SExpression(s));;
-	} else if (isalpha(c)) {
+	} else if (Comment::IsDelim(c)) {
+		return new Comment(s, new SExpression(s));
+	} else if (Ident::IsDelim(c)) {
 		return new Ident(s);
-	} else if (c >= '0' && c <= '9') {
+	} else if (Num::IsDelim(c)) {
 		return new Num(s);
-	} else if (c == '\'') {
+	} else if (Tick::IsDelim(c)) {
 		return new Tick(s);
+	} else if (String::IsDelim(c)) {
+		return new String(s, new SExpression(s));
 	} else if (c == EOF) {
 		std::stringstream str;
 		str << "unexpected EOF";
@@ -115,13 +118,27 @@ StateInterface *Comment::Next() {
 	return next;
 }
 
+StateInterface *String::Next() {
+	char c = s->scanner->Next();
+	char delim = c; // " or '
+	s->pos = s->scanner->pos();
+	// lex "stuff"
+	do {
+		s->buf.push_back(c);
+	} while ((c = s->scanner->Next()) != delim);
+	s->buf.push_back(c); // save end '"'
+	s->toks.push(new Token(Token::kString, s->pos, s->buf));
+	s->buf.clear();
+	return next;
+}
+
 StateInterface *Start::Next() {
 	char c = s->scanner->Peek();
-	if (Whitespace::Is(c)) {
+	if (Whitespace::IsDelim(c)) {
 		return new Whitespace(s, new Start(s));
-	} else if (c == '#') {
+	} else if (Comment::IsDelim(c)) {
 		return new Comment(s, new Start(s));
-	} else if (c == '(') {
+	} else if (SExpressionDelim::IsDelim(c)) {
 		return new SExpressionDelim(s);
 	} else if (c == EOF) {
 		return nullptr;
@@ -149,6 +166,6 @@ Token *StateMachine::Next() {
 	}
 }
 
-Token *Lexer::Next() {
+Token *Lexer::Get() {
 	return mach.Next();
 }

@@ -17,6 +17,29 @@ enum Token::TokenCategory Token::category() const {
 	return category_;
 }
 
+std::string Token::String() const {
+	switch (category_) {
+	case Token::kBeginParen:
+		return "Begin Paren";
+	case Token::kEndParen:
+		return "End Paren";
+	case Token::kEndAllParen:
+		return "End All Paren";
+	case Token::kIdent:
+		return "Ident";
+	case Token::kNum:
+		return "Num";
+	case Token::kString:
+		return "String";
+	case Token::kTick:
+		return "Tick";
+	case Token::kComment:
+		return "Comment";
+	case Token::kError:
+		return "Error";
+	}
+}
+
 Position Token::pos() const {
 	return pos_;
 }

@@ -9,75 +9,88 @@
 #include "token.h"
 
 #include <map>
+#include <vector>
+#include <ostream>
 
 namespace crisp {
 
-// generic table item for encapsulating different data types.
-class SymbolTableItem {
-public:
-	enum SymbolTableCategory {
-		kInteger,
-		kFloat,
-		kString,
-		kIdent
-	};
-	SymbolTableItem(int i) : category_(kInteger), integer(i) {}
-	SymbolTableItem(float f) : category_(kFloat), floating_point(f) {}
-	SymbolTableItem(SymbolTableCategory cat, std::string *str) : category_(cat), string(str) {}
-private:
-	SymbolTableCategory category_;
-	union {
-		int integer;
-		float floating_point;
-		std::string *string;
-	};
-};
-
 class NodeInterface {
 public:
-	// NodeCategory allows for casting by indicating
-	// which subclass a node is.
-	enum NodeCategory {
-		kSymbol,
-	};
-
 	virtual ~NodeInterface() {}
-
-	virtual int NumChildren() = 0;
-	virtual NodeInterface *Child(int n) = 0;
-	virtual NodeInterface *Parent() = 0;
-
-	virtual NodeCategory Category() = 0;
+	virtual void Put(NodeInterface *node) = 0;
+	virtual void PPrint(std::ostream& os) = 0;
+	virtual Token *tok() const = 0;
 };
 
-class SymbolNode : public NodeInterface {
+class ListNode : public NodeInterface {
 public:
-	SymbolNode(NodeInterface *p) : parent(p) {}
+	ListNode(Token *tok) : tok_(tok) {}
 
-	virtual int NumChildren() { return children.size(); }
+	virtual void Put(NodeInterface *node) {
+		children.push_back(node);
+	}
 
-	virtual NodeInterface *GetChild(int n) {
-		// simple bounds checking.
-		if (n < children.size()) {
-			return children[n];
-		} else {
-			return nullptr;
+	virtual void PPrint(std::ostream& os) {
+		os << "(";
+		for (auto i = children.begin(); i != children.end(); i++) {
+			(*i)->PPrint(os);
+			if ((i + 1) != children.end()) {
+				os << " ";
+			}
+		}
+		os << ")";
+	}
+
+	virtual Token *tok() const {
+		return tok_;
+	}
+private:
+	Token *tok_;
+	std::vector<NodeInterface *> children;
+};
+
+class Node : public NodeInterface {
+public:
+	Node(Token *tok) : tok_(tok) {}
+	~Node() {
+		delete tok_;
+		for (auto i = children.begin(); i != children.end(); i++) {
+			delete *i;
 		}
 	}
 
-	virtual NodeCategory Category() { return category; }
+	void Put(NodeInterface *node) {
+		children.push_back(node);
+	}
+
+	virtual void PPrint(std::ostream& os) {
+		os << tok_->String() << "{" << tok_->lexeme() << "}";
+	}
+
+	Token *tok() const {
+		return tok_;
+	}
+
 private:
-	static const NodeCategory category = kSymbol;
+	Token *tok_;
 	std::vector<NodeInterface *> children;
-	NodeInterface *parent;
 };
 
-class TreeGenerator {
+class SymbolTable {
 public:
-	void Put(Token *t);
+	void Put(std::string str, NodeInterface *node) {
+		table[str] = node;
+	}
+
+	NodeInterface *Get(std::string str) {
+		try {
+			return table.at(str);
+		} catch (...) {
+			return nullptr;
+		}
+	}
 private:
-	NodeInterface *root;
-	NodeInterface *current;
+	std::map<std::string, NodeInterface *> table;
 };
 
 } // namespace crisp
