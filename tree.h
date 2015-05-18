@@ -35,6 +35,7 @@ public:
 		kString,
 		kError,
 		kCallable,
+		kNull,
 		kOther
 	};
 
@@ -62,6 +63,8 @@ public:
 			return "Error";
 		case kCallable:
 			return "Callable";
+		case kNull:
+			return "Null";
 		case kOther:
 			return "Unknown";
 		}
@@ -73,6 +76,26 @@ public:
 	}
 protected:
 	const bool constant_;
+};
+
+class NullNode : public NodeInterface {
+public:
+	virtual std::string PPrint() const {
+		// an empty list is considered null.
+		return "()";
+	}
+
+	virtual enum Category GetCategory() const {
+		return kNull;
+	}
+
+	virtual bool IsConstant() const {
+		return false;
+	}
+
+	virtual Position *GetPosition() {
+		return nullptr;
+	}
 };
 
 class ParentNode : public Node {
@@ -118,11 +141,11 @@ class RootNode : public ParentNode {
 		for (auto i = children.begin(); i != children.end(); i++) {
 			if (*i != nullptr) {
 				os << (*i)->PPrint();
-				if ((i + 1) != children.end()) {
-					os << " ";
-				}
 			} else {
 				os << "null";
+			}
+			if ((i + 1) != children.end()) {
+				os << " ";
 			}
 		}
 		return os.str();
@@ -156,11 +179,11 @@ public:
 		for (auto i = children.begin(); i != children.end(); i++) {
 			if (*i != nullptr) {
 				os << (*i)->PPrint();
-				if ((i + 1) != children.end()) {
-					os << " ";
-				}
 			} else {
 				os << "null";
+			}
+			if ((i + 1) != children.end()) {
+				os << " ";
 			}
 		}
 		os << ")";
@@ -339,17 +362,24 @@ public:
 			os << (*i).first << ": ";
 			if ((*i).second != nullptr) {
 				os << (*i).second->PPrint();
-				auto j = i;
-				if (i++ != table.end()) {
-					os << " ";
-				}
-				i = j;
 			} else {
 				os << "null";
 			}
+			auto j = i;
+			if (i++ != table.end()) {
+				os << " ";
+			}
+			i = j;
 			os << std::endl;
 		}
 		return os.str();
+	}
+
+	SymbolTable *Copy() {
+		auto symb = new SymbolTable();
+		// copy
+		symb->table = table;
+		return symb;
 	}
 
 private:

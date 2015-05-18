@@ -25,11 +25,69 @@ private:
 	SymbolTable& table;
 };
 
+class LambdaInstance : public CallableNode {
+public:
+	LambdaInstance(SymbolTable *t, ListNode *f, NodeInterface *body) : table(t), func(f), func_body(body) {}
+
+	virtual std::string PPrint() const {
+		return "Lambda-Instance";
+	}
+
+	virtual NodeInterface *Call(std::vector<NodeInterface *>& params) {
+		// localize data by creating a new symbol table.
+		SymbolTable *symb = table->Copy();
+
+		// add definitions for the local scope by using
+		// a localized Define
+		Define def(*symb);
+
+		// Define these parameters against the ids in the
+		// call to Lambda's 1st parameter (the function definition list).
+		// ...
+
+		// TODO: define a LocalSymbolTable that uses a list instead
+		// of a map and points back to a previous SymbolTableInterface
+		// (if not null) to continue searching.
+
+		return new NullNode();
+	}
+private:
+	SymbolTable *table;
+	ListNode *func;
+	NodeInterface *func_body;
+};
+
+class Lambda : public CallableNode {
+public:
+	Lambda(SymbolTable& t) : table(t) {}
+
+	virtual std::string PPrint() const {
+		return "Lambda";
+	}
+
+	virtual NodeInterface *Call(std::vector<NodeInterface *>& params) {
+		// this callable takes arguments to create a lambda,
+		// then returns another callable that executes the lambda.
+		if (params.size() == 2) {
+			if (params[0]->GetCategory() == NodeInterface::kList) {
+				return new LambdaInstance(&table, static_cast<ListNode *>(params[0]), params[1]);
+			} else {
+				return new ErrorNode("Lambda: first atom must be list of function parameters");
+			}
+		} else {
+			return new ErrorNode("Lambda: takes two atoms");
+		}
+	}
+private:
+	SymbolTable& table;
+};
+
 class ExecutionState {
 public:
 	ExecutionState() {
 		// add preliminary definitions to the symbol table.
 		table.Put("def", new Define(GetSymbolTable()));
+		table.Put("lambda", new Lambda(GetSymbolTable()));
 	}
 
 	SymbolTable& GetSymbolTable() {
@@ -58,7 +116,7 @@ private:
 		// return new trees.
 
 		if (
-			node->IsConstant()
+			(node->GetCategory() == NodeInterface::kIdent && node->IsConstant())
 			|| node->GetCategory() == NodeInterface::kNum
 			|| node->GetCategory() == NodeInterface::kString
 			|| node->GetCategory() == NodeInterface::kCallable
@@ -69,9 +127,18 @@ private:
 			// idents evaluate to their definitions
 			std::string id_name = static_cast<IdentNode *>(node)->GetIdentString();
 			NodeInterface *def = state_.GetSymbolTable().Get(id_name);
-			// definition is evaluated lazily.
-			return EvaluateAtom(def);
-		} else if (node->GetCategory() == NodeInterface::kRoot) {
+			if (def == nullptr) {
+				// no definition found!
+				std::stringstream s;
+				s << "Identifier '" << id_name << "' has not been defined";
+				return new ErrorNode(s.str());
+			} else {
+				// definition is evaluated lazily.
+				return EvaluateAtom(def);
+			}
+		} else if (
+			node->GetCategory() == NodeInterface::kRoot
+			|| (node->GetCategory() == NodeInterface::kList && node->IsConstant())) {
 			auto root = static_cast<ParentNode *>(node);
 			for (auto i = root->ChildBegin(); i != root->ChildEnd(); i++) {
 				*i = EvaluateAtom(*i);
@@ -90,22 +157,24 @@ private:
 					// now create a vector of parameters.
 					std::vector<NodeInterface *> params;
 					auto i = static_cast<ParentNode *>(node)->ChildBegin();
-					i++; // dismiss the first atom.
-					for (; i != static_cast<ParentNode *>(node)->ChildEnd(); i++) {
-						params.push_back(*i);
+					if (i != static_cast<ParentNode *>(node)->ChildEnd()) {
+						i++; // dismiss the first atom.
+						for (; i != static_cast<ParentNode *>(node)->ChildEnd(); i++) {
+
+							params.push_back(*i);
+						}
 					}
 
 					// execute call
 					return call->Call(params);
 				} else {
 					std::stringstream s;
-					s << "Active List: first atom must be Callable not " << Node::CategoryString(callNode->GetCategory()) << "(" << callNode->PPrint() << ")";
+					s << "Active List: first atom must be Callable not '" << callNode->PPrint() << "'";
 					return new ErrorNode(s.str());
 				}
 			} else {
-				// NOTE: empty list evalutes to itself?
-				// TODO: make this a NullNode or something.
-				return node;
+				// empty list is a NullNode.
+				return new NullNode();
 			}
 		} else {
 			return new ErrorNode("You have confused the interpreter");
