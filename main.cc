@@ -7,7 +7,7 @@
 #include <future>
 
 int main() {
-	crisp::InputScanner scanner(&std::cout);
+	crisp::InputScanner scanner(&std::cin);
 	crisp::Lexer lex(&scanner);
 	crisp::Parser p;
 	crisp::Channel<crisp::Token *> chan(5);

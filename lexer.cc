@@ -52,15 +52,11 @@ StateInterface *SExpressionDelim::Next() {
 	} else if (c == ')') {
 		s->toks.push(new Token(Token::kEndParen, s->scanner->pos(), std::string(1, c)));
 		s->paren_depth--;
-		if (s->paren_depth > 0) {
-			return new SExpression(s);
-		} else {
-			return new Start(s);
-		}
+		return new SExpression(s);
 	} else if (c == ']') {
 		s->toks.push(new Token(Token::kEndAllParen, s->scanner->pos(), std::string(1, c)));
 		s->paren_depth = 0;
-		return new Start(s);
+		return new SExpression(s);
 	} else {
 		// should never reach
 		return nullptr;
@@ -84,9 +80,11 @@ StateInterface *SExpression::Next() {
 	} else if (String::IsDelim(c)) {
 		return new String(s, new SExpression(s));
 	} else if (c == EOF) {
-		std::stringstream str;
-		str << "unexpected EOF";
-		s->toks.push(new Token(Token::kError, s->scanner->pos(), str.str()));
+		if (s->paren_depth > 0) {
+			std::stringstream str;
+			str << "unexpected EOF";
+			s->toks.push(new Token(Token::kError, s->scanner->pos(), str.str()));
+		}
 		return nullptr;
 	} else {
 		std::stringstream str;
@@ -130,25 +128,6 @@ StateInterface *String::Next() {
 	s->toks.push(new Token(Token::kString, s->pos, s->buf));
 	s->buf.clear();
 	return next;
-}
-
-StateInterface *Start::Next() {
-	char c = s->scanner->Peek();
-	if (Whitespace::IsDelim(c)) {
-		return new Whitespace(s, new Start(s));
-	} else if (Comment::IsDelim(c)) {
-		return new Comment(s, new Start(s));
-	} else if (SExpressionDelim::IsDelim(c)) {
-		return new SExpressionDelim(s);
-	} else if (c == EOF) {
-		return nullptr;
-	} else {
-		s->scanner->Next();
-		std::stringstream str;
-		str << "unexpected character '" << c << "'";
-		s->toks.push(new Token(Token::kError, s->scanner->pos(), str.str()));
-		return nullptr;
-	}
 }
 
 Token *StateMachine::Next() {

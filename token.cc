@@ -9,11 +9,11 @@ using namespace crisp;
 
 Token::Token(const enum TokenCategory c, const Position p, const std::string l) : category_(c), pos_(p), lexeme_(l) {}
 
-std::string Token::lexeme() const {
+std::string Token::GetLexeme() const {
 	return lexeme_;
 }
 
-enum Token::TokenCategory Token::category() const {
+enum Token::TokenCategory Token::GetCategory() const {
 	return category_;
 }
 
@@ -40,6 +40,6 @@ std::string Token::String() const {
 	}
 }
 
-Position Token::pos() const {
+Position Token::GetPosition() const {
 	return pos_;
 }

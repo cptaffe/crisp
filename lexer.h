@@ -166,17 +166,9 @@ private:
 	StateInterface *next;
 };
 
-class Start : public StateInterface {
-public:
-	Start(SharedStateData *state): s(state) {}
-	virtual StateInterface *Next();
-private:
-	SharedStateData *s;
-};
-
 class StateMachine {
 public:
-	StateMachine(ScannerInterface *scanner) : s(scanner), state(new Start(&s)) {}
+	StateMachine(ScannerInterface *scanner) : s(scanner), state(new SExpression(&s)) {}
 	~StateMachine() {
 		delete state;
 	}

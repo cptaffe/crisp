@@ -31,10 +31,9 @@ public:
 
 	// returns token as string
 	std::string String() const;
-
-	std::string lexeme() const;
-	enum TokenCategory category() const;
-	Position pos() const;
+	std::string GetLexeme() const;
+	enum TokenCategory GetCategory() const;
+	Position GetPosition() const;
 private:
 	std::string lexeme_;
 	enum TokenCategory category_;
