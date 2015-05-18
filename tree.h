@@ -27,6 +27,8 @@ public:
 
 	virtual Position *GetPosition() = 0;
 
+	// Category, each pertaining to its class.
+	// Use this to cast appropriately from NodeInterface.
 	enum Category {
 		kRoot,
 		kList,
