@@ -47,29 +47,6 @@ class Node : public NodeInterface {
 public:
 	Node(bool constant = false) : constant_(constant) {}
 
-	static std::string CategoryString(enum Category c) {
-		switch (c) {
-		case kRoot:
-			return "Root";
-		case kList:
-			return "List";
-		case kNum:
-			return "Num";
-		case kIdent:
-			return "Ident";
-		case kString:
-			return "String";
-		case kError:
-			return "Error";
-		case kCallable:
-			return "Callable";
-		case kNull:
-			return "Null";
-		case kOther:
-			return "Unknown";
-		}
-	}
-
 	// returns if this atom is constant.
 	virtual bool IsConstant() const {
 		return constant_;
