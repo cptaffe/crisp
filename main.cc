@@ -28,6 +28,11 @@ int main() {
 		}
 	}, &p, &chan);
 
+	// TODO:
+	// Third channel for trees of each statement.
+	// Lexer passes kPossibleBreak (newline and/or paren-cout is 0)
+	// Parser decides if it has a full statement (paren-count)
+
 	lexf.wait();
 	parsef.wait();
 
@@ -39,12 +44,8 @@ int main() {
 	node = xpass.Apply(node);
 
 	if (node != nullptr) {
-		std::cout << ">> ";
-		node->PPrint(std::cout);
-		std::cout << std::endl;
+		std::cout << ">> " << node->PPrint() << std::endl;
 	}
 
-	exec.GetSymbolTable().PPrint(std::cout);
-
-	// do first pass on tree.
+	std::cout << exec.GetSymbolTable().PPrint();
 }

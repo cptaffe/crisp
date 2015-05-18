@@ -10,7 +10,6 @@
 
 #include <map>
 #include <vector>
-#include <ostream>
 #include <sstream>
 
 namespace crisp {
@@ -21,7 +20,7 @@ public:
 
 	// prints a pretty printed representation of this
 	// node and its child nodes to an ostream.
-	virtual void PPrint(std::ostream& os) const = 0;
+	virtual std::string PPrint() const = 0;
 
 	// returns if this node is constant, e.g. '(a b c) or 'a.
 	virtual bool IsConstant() const = 0;
@@ -35,6 +34,7 @@ public:
 		kIdent,
 		kString,
 		kError,
+		kCallable,
 		kOther
 	};
 
@@ -60,6 +60,8 @@ public:
 			return "String";
 		case kError:
 			return "Error";
+		case kCallable:
+			return "Callable";
 		case kOther:
 			return "Unknown";
 		}
@@ -89,6 +91,19 @@ protected:
 	std::vector<NodeInterface *> children;
 };
 
+class CallableNode : public Node {
+public:
+	virtual NodeInterface *Call(std::vector<NodeInterface *>& params) = 0;
+
+	virtual enum Category GetCategory() const {
+		return kCallable;
+	}
+
+	virtual Position *GetPosition() {
+		return nullptr;
+	}
+};
+
 class RootNode : public ParentNode {
 	virtual void Put(NodeInterface *node) {
 		children.push_back(node);
@@ -98,10 +113,11 @@ class RootNode : public ParentNode {
 		return nullptr;
 	}
 
-	virtual void PPrint(std::ostream& os) const {
+	virtual std::string PPrint() const {
+		std::stringstream os;
 		for (auto i = children.begin(); i != children.end(); i++) {
 			if (*i != nullptr) {
-				(*i)->PPrint(os);
+				os << (*i)->PPrint();
 				if ((i + 1) != children.end()) {
 					os << " ";
 				}
@@ -109,6 +125,7 @@ class RootNode : public ParentNode {
 				os << "null";
 			}
 		}
+		return os.str();
 	}
 
 	virtual enum Category GetCategory() const {
@@ -130,14 +147,15 @@ public:
 		return &pos;
 	}
 
-	virtual void PPrint(std::ostream& os) const {
+	virtual std::string PPrint() const {
+		std::stringstream os;
 		if (constant_) {
 			os << "\'";
 		}
 		os << "(";
 		for (auto i = children.begin(); i != children.end(); i++) {
 			if (*i != nullptr) {
-				(*i)->PPrint(os);
+				os << (*i)->PPrint();
 				if ((i + 1) != children.end()) {
 					os << " ";
 				}
@@ -146,6 +164,7 @@ public:
 			}
 		}
 		os << ")";
+		return os.str();
 	}
 
 	virtual enum Category GetCategory() const {
@@ -162,11 +181,13 @@ public:
 		delete tok;
 	}
 
-	virtual void PPrint(std::ostream& os) const {
+	virtual std::string PPrint() const {
+		std::stringstream os;
 		if (constant_) {
 			os << "\'";
 		}
 		os << str;
+		return os.str();
 	}
 
 	virtual Position *GetPosition() {
@@ -199,11 +220,13 @@ public:
 		delete tok;
 	}
 
-	virtual void PPrint(std::ostream& os) const {
+	virtual std::string PPrint() const {
+		std::stringstream os;
 		if (constant_) {
 			os << "\'";
 		}
 		os << num;
+		return os.str();
 	}
 
 	virtual Position *GetPosition() {
@@ -223,8 +246,10 @@ class ErrorNode : public Node {
 public:
 	ErrorNode(std::string msg) : msg_(msg) {}
 
-	virtual void PPrint(std::ostream& os) const {
+	virtual std::string PPrint() const {
+		std::stringstream os;
 		os << "Error{" << msg_ << "}";
+		return os.str();
 	}
 
 	virtual Position *GetPosition() {
@@ -246,11 +271,13 @@ public:
 		delete tok_;
 	}
 
-	virtual void PPrint(std::ostream& os) const {
+	virtual std::string PPrint() const {
+		std::stringstream os;
 		if (constant_) {
 			os << "\'";
 		}
 		os << tok_->String() << "{" << tok_->GetLexeme() << "}";
+		return os.str();
 	}
 
 	virtual Position *GetPosition() {
@@ -306,11 +333,12 @@ public:
 		}
 	}
 
-	void PPrint(std::ostream& os) const {
+	std::string PPrint() const {
+		std::stringstream os;
 		for (auto i = table.begin(); i != table.end(); i++) {
 			os << (*i).first << ": ";
 			if ((*i).second != nullptr) {
-				(*i).second->PPrint(os);
+				os << (*i).second->PPrint();
 				auto j = i;
 				if (i++ != table.end()) {
 					os << " ";
@@ -321,6 +349,7 @@ public:
 			}
 			os << std::endl;
 		}
+		return os.str();
 	}
 
 private:
