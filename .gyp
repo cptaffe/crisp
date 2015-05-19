@@ -20,7 +20,8 @@
 				'lexer.cc',
 				'scanner.cc',
 				'token.cc',
-				'tree.cc'
+				'tree.cc',
+				'pass.cc',
 			],
 			'include_dirs': [],
 		},

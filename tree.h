@@ -22,11 +22,6 @@ public:
 	// node and its child nodes to an ostream.
 	virtual std::string PPrint() const = 0;
 
-	// returns if this node is constant, e.g. '(a b c) or 'a.
-	virtual bool IsConstant() const = 0;
-
-	virtual Position *GetPosition() = 0;
-
 	// Category, each pertaining to its class.
 	// Use this to cast appropriately from NodeInterface.
 	enum Category {
@@ -42,19 +37,7 @@ public:
 	};
 
 	// returns category
-	virtual enum Category GetCategory() const = 0;
-};
-
-class Node : public NodeInterface {
-public:
-	Node(bool constant = false) : constant_(constant) {}
-
-	// returns if this atom is constant.
-	virtual bool IsConstant() const {
-		return constant_;
-	}
-protected:
-	const bool constant_;
+	virtual enum Category category() const = 0;
 };
 
 class NullNode : public NodeInterface {
@@ -64,55 +47,39 @@ public:
 		return "()";
 	}
 
-	virtual enum Category GetCategory() const {
+	virtual enum Category category() const {
 		return kNull;
-	}
-
-	virtual bool IsConstant() const {
-		return false;
-	}
-
-	virtual Position *GetPosition() {
-		return nullptr;
 	}
 };
 
-class ParentNode : public Node {
+class ParentNode : public NodeInterface {
 public:
-	ParentNode(bool constant = false) : Node(constant) {}
+	ParentNode(bool constant = false) {}
 	virtual void Put(NodeInterface *node) = 0;
 
-	virtual std::vector<NodeInterface *>::iterator ChildBegin() {
+	virtual std::vector<NodeInterface *>::iterator Begin() {
 		return children.begin();
 	}
 
-	virtual std::vector<NodeInterface *>::iterator ChildEnd() {
+	virtual std::vector<NodeInterface *>::iterator End() {
 		return children.end();
 	}
 protected:
 	std::vector<NodeInterface *> children;
 };
 
-class CallableNode : public Node {
+class CallableNode : public NodeInterface {
 public:
 	virtual NodeInterface *Call(std::vector<NodeInterface *>& params) = 0;
 
-	virtual enum Category GetCategory() const {
+	virtual enum Category category() const {
 		return kCallable;
-	}
-
-	virtual Position *GetPosition() {
-		return nullptr;
 	}
 };
 
 class RootNode : public ParentNode {
 	virtual void Put(NodeInterface *node) {
 		children.push_back(node);
-	}
-
-	virtual Position *GetPosition() {
-		return nullptr;
 	}
 
 	virtual std::string PPrint() const {
@@ -130,23 +97,17 @@ class RootNode : public ParentNode {
 		return os.str();
 	}
 
-	virtual enum Category GetCategory() const {
+	virtual enum Category category() const {
 		return kRoot;
 	}
 };
 
 class ListNode : public ParentNode {
 public:
-	ListNode(Token *tok, bool con) : pos(tok->GetPosition()), ParentNode(con) {
-		delete tok;
-	}
+	ListNode(Token *tok, bool con = false) : constant_(con) {}
 
 	virtual void Put(NodeInterface *node) {
 		children.push_back(node);
-	}
-
-	virtual Position *GetPosition() {
-		return &pos;
 	}
 
 	virtual std::string PPrint() const {
@@ -169,82 +130,95 @@ public:
 		return os.str();
 	}
 
-	virtual enum Category GetCategory() const {
+	virtual enum Category category() const {
 		return kList;
 	}
 
+	virtual bool constant() const {
+		return constant_;
+	}
+
 private:
-	Position pos;
+	const bool constant_;
 };
 
-class IdentNode : public Node {
+class IdentNode : public NodeInterface {
 public:
-	IdentNode(Token *tok, bool constant) : str(tok->GetLexeme()), pos(tok->GetPosition()), Node(constant) {
-		delete tok;
-	}
+	IdentNode(Token *tok, bool con = false) : constant_(con), str_(tok->GetLexeme()) {}
 
 	virtual std::string PPrint() const {
 		std::stringstream os;
 		if (constant_) {
 			os << "\'";
 		}
-		os << str;
+		os << str();
 		return os.str();
 	}
 
-	virtual Position *GetPosition() {
-		return &pos;
+	virtual bool constant() const {
+		return constant_;
 	}
 
-	virtual enum Category GetCategory() const {
+	virtual enum Category category() const {
 		return kIdent;
 	}
 
-	std::string GetIdentString() const {
-		return str;
+	std::string str() const {
+		return str_;
 	}
 
 private:
-	std::string str;
-	Position pos;
+	std::string str_;
+	const bool constant_;
 };
 
-class NumNode : public Node {
+class NumNode : public NodeInterface {
 public:
-	NumNode(Token *tok, bool constant) : num([&]{
+	NumNode(Token *tok) : num([&]{
 		// crappy number conversion
 		int n;
 		std::stringstream s;
 		s << tok->GetLexeme();
 		s >> n;
 		return n;
-	}()), pos(tok->GetPosition()), Node(constant) {
-		delete tok;
-	}
+	}()) {}
 
 	virtual std::string PPrint() const {
 		std::stringstream os;
-		if (constant_) {
-			os << "\'";
-		}
 		os << num;
 		return os.str();
 	}
 
-	virtual Position *GetPosition() {
-		return &pos;
-	}
-
-	virtual enum Category GetCategory() const {
+	virtual enum Category category() const {
 		return kNum;
 	}
 
 private:
 	int num;
-	Position pos;
 };
 
-class ErrorNode : public Node {
+class StringNode : public NodeInterface {
+public:
+	StringNode(Token *tok) : str_(tok->GetLexeme()) {}
+
+	virtual std::string PPrint() const {
+		std::stringstream os;
+		os << "\"" << str() << "\"";
+		return os.str();
+	}
+
+	virtual enum Category category() const {
+		return kString;
+	}
+
+	std::string str() const {
+		return str_;
+	}
+private:
+	std::string str_;
+};
+
+class ErrorNode : public NodeInterface {
 public:
 	ErrorNode(std::string msg) : msg_(msg) {}
 
@@ -254,53 +228,12 @@ public:
 		return os.str();
 	}
 
-	virtual Position *GetPosition() {
-		return nullptr;
-	}
-
-	virtual enum Category GetCategory() const {
+	virtual enum Category category() const {
 		return kError;
 	}
 
 private:
 	std::string msg_;
-};
-
-class GeneralNode : public Node {
-public:
-	GeneralNode(Token *tok, bool con) : tok_(tok), Node(con) {}
-	~GeneralNode() {
-		delete tok_;
-	}
-
-	virtual std::string PPrint() const {
-		std::stringstream os;
-		if (constant_) {
-			os << "\'";
-		}
-		os << tok_->String() << "{" << tok_->GetLexeme() << "}";
-		return os.str();
-	}
-
-	virtual Position *GetPosition() {
-		return nullptr;
-	}
-
-	virtual enum NodeInterface::Category GetCategory() const {
-		switch (tok_->GetCategory()) {
-		case Token::kNum:
-			return kNum;
-		case Token::kIdent:
-			return kIdent;
-		case Token::kString:
-			return kString;
-		default:
-			return kOther;
-		}
-	}
-
-private:
-	Token *tok_;
 };
 
 // returns specific class instantiations for non-list nodes.
@@ -312,9 +245,13 @@ public:
 		if (tok->GetCategory() == Token::kIdent) {
 			return new IdentNode(tok, constant);
 		} else if (tok->GetCategory() == Token::kNum) {
-			return new NumNode(tok, constant);
+			return new NumNode(tok);
+		} else if (tok->GetCategory() == Token::kString) {
+			return new StringNode(tok);
 		} else {
-			return new GeneralNode(tok, constant);
+			std::stringstream s;
+			s << "Unknown token type '" << tok->String() << "'";
+			return new ErrorNode(s.str());
 		}
 	}
 private:
@@ -323,6 +260,11 @@ private:
 
 class SymbolTable {
 public:
+	SymbolTable() = default;
+	SymbolTable(const SymbolTable& s) {
+		table = s.table;
+	}
+
 	void Put(std::string str, NodeInterface *node) {
 		table[str] = node;
 	}
@@ -352,13 +294,6 @@ public:
 			os << std::endl;
 		}
 		return os.str();
-	}
-
-	SymbolTable *Copy() {
-		auto symb = new SymbolTable();
-		// copy
-		symb->table = table;
-		return symb;
 	}
 
 private:

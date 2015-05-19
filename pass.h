@@ -9,50 +9,20 @@ namespace crisp {
 // (def name thing)
 class Define : public CallableNode {
 public:
-	Define(SymbolTable& t) : table(t) {}
-
-	virtual std::string PPrint() const {
-		return "Define";
-	}
-
-	virtual NodeInterface *Call(std::vector<NodeInterface *>& params) {
-		// add an entry to the symbol table.
-		std::string str = static_cast<IdentNode *>(params[0])->GetIdentString();
-		table.Put(str, params[1]);
-		return params[0];
-	}
+	Define(SymbolTable& t);
+	virtual std::string PPrint() const;
+	virtual NodeInterface *Call(std::vector<NodeInterface *>& params);
 private:
 	SymbolTable& table;
 };
 
 class LambdaInstance : public CallableNode {
 public:
-	LambdaInstance(SymbolTable *t, ListNode *f, NodeInterface *body) : table(t), func(f), func_body(body) {}
-
-	virtual std::string PPrint() const {
-		return "Lambda-Instance";
-	}
-
-	virtual NodeInterface *Call(std::vector<NodeInterface *>& params) {
-		// localize data by creating a new symbol table.
-		SymbolTable *symb = table->Copy();
-
-		// add definitions for the local scope by using
-		// a localized Define
-		Define def(*symb);
-
-		// Define these parameters against the ids in the
-		// call to Lambda's 1st parameter (the function definition list).
-		// ...
-
-		// TODO: define a LocalSymbolTable that uses a list instead
-		// of a map and points back to a previous SymbolTableInterface
-		// (if not null) to continue searching.
-
-		return new NullNode();
-	}
+	LambdaInstance(SymbolTable& t, ListNode *f, NodeInterface *body);
+	virtual std::string PPrint() const;
+	virtual NodeInterface *Call(std::vector<NodeInterface *>& params);
 private:
-	SymbolTable *table;
+	SymbolTable& table;
 	ListNode *func;
 	NodeInterface *func_body;
 };
@@ -62,15 +32,15 @@ public:
 	Lambda(SymbolTable& t) : table(t) {}
 
 	virtual std::string PPrint() const {
-		return "Lambda";
+		return "Builtin<Lambda>";
 	}
 
 	virtual NodeInterface *Call(std::vector<NodeInterface *>& params) {
 		// this callable takes arguments to create a lambda,
 		// then returns another callable that executes the lambda.
 		if (params.size() == 2) {
-			if (params[0]->GetCategory() == NodeInterface::kList) {
-				return new LambdaInstance(&table, static_cast<ListNode *>(params[0]), params[1]);
+			if (params[0]->category() == NodeInterface::kList) {
+				return new LambdaInstance(table, static_cast<ListNode *>(params[0]), params[1]);
 			} else {
 				return new ErrorNode("Lambda: first atom must be list of function parameters");
 			}
@@ -86,16 +56,18 @@ class ExecutionState {
 public:
 	ExecutionState() {
 		// add preliminary definitions to the symbol table.
-		table.Put("def", new Define(GetSymbolTable()));
-		table.Put("lambda", new Lambda(GetSymbolTable()));
+		symbol_table_.Put("def", new Define(symbol_table()));
+		symbol_table_.Put("lambda", new Lambda(symbol_table()));
 	}
 
-	SymbolTable& GetSymbolTable() {
-		return table;
+	ExecutionState(SymbolTable s) : symbol_table_(s) {}
+
+	SymbolTable& symbol_table() {
+		return symbol_table_;
 	}
 
 private:
-	SymbolTable table;
+	SymbolTable symbol_table_;
 };
 
 class ExecutePass {
@@ -115,18 +87,22 @@ private:
 		// TODO: don't delete any nodes, all evaluations should just
 		// return new trees.
 
+		auto cat = node->category();
+
 		if (
-			(node->GetCategory() == NodeInterface::kIdent && node->IsConstant())
-			|| node->GetCategory() == NodeInterface::kNum
-			|| node->GetCategory() == NodeInterface::kString
-			|| node->GetCategory() == NodeInterface::kCallable
+			(cat == NodeInterface::kIdent && static_cast<IdentNode *>(node)->constant())
+			|| cat == NodeInterface::kNum
+			|| cat == NodeInterface::kString
+			|| cat == NodeInterface::kCallable
 		) {
 			// constants and literals evaluate to themselves.
 			return node;
-		} else if (node->GetCategory() == NodeInterface::kIdent) {
+		} else if (cat == NodeInterface::kIdent) {
+
 			// idents evaluate to their definitions
-			std::string id_name = static_cast<IdentNode *>(node)->GetIdentString();
-			NodeInterface *def = state_.GetSymbolTable().Get(id_name);
+			std::string id_name = static_cast<IdentNode *>(node)->str();
+			NodeInterface *def = state_.symbol_table().Get(id_name);
+
 			if (def == nullptr) {
 				// no definition found!
 				std::stringstream s;
@@ -136,30 +112,28 @@ private:
 				// definition is evaluated lazily.
 				return EvaluateAtom(def);
 			}
-		} else if (
-			node->GetCategory() == NodeInterface::kRoot
-			|| (node->GetCategory() == NodeInterface::kList && node->IsConstant())) {
+		} else if (cat == NodeInterface::kRoot || (cat == NodeInterface::kList && static_cast<ListNode *>(node)->constant())) {
 			auto root = static_cast<ParentNode *>(node);
-			for (auto i = root->ChildBegin(); i != root->ChildEnd(); i++) {
+			for (auto i = root->Begin(); i != root->End(); i++) {
 				*i = EvaluateAtom(*i);
 			}
 			return root;
-		} else if (node->GetCategory() == NodeInterface::kList) {
+		} else if (cat == NodeInterface::kList) {
 			// active list
-			NodeInterface *callNode = *(static_cast<ParentNode *>(node)->ChildBegin());
+			NodeInterface *callNode = *(static_cast<ParentNode *>(node)->Begin());
 			if (callNode != nullptr) {
 				// evaluate atom to call
 				// assure it is a CallableNode.
 				callNode = EvaluateAtom(callNode);
-				if (callNode->GetCategory() == NodeInterface::kCallable) {
+				if (callNode->category() == NodeInterface::kCallable) {
 					CallableNode *call = static_cast<CallableNode *>(callNode);
 
 					// now create a vector of parameters.
 					std::vector<NodeInterface *> params;
-					auto i = static_cast<ParentNode *>(node)->ChildBegin();
-					if (i != static_cast<ParentNode *>(node)->ChildEnd()) {
+					auto i = static_cast<ParentNode *>(node)->Begin();
+					if (i != static_cast<ParentNode *>(node)->End()) {
 						i++; // dismiss the first atom.
-						for (; i != static_cast<ParentNode *>(node)->ChildEnd(); i++) {
+						for (; i != static_cast<ParentNode *>(node)->End(); i++) {
 
 							params.push_back(*i);
 						}

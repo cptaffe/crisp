@@ -41,7 +41,6 @@ public:
 			} else {
 				path.pop_back(); // ascend tree
 			}
-			delete tok; // not used
 		} else if (tok->GetCategory() == Token::kEndAllParen) {
 			paren_count = 0;
 			NodeInterface *node = path.front();
@@ -49,15 +48,25 @@ public:
 			path.push_back(node);
 		} else if (tok->GetCategory() == Token::kTick) {
 			nextNodeIsConstant = true;
-			delete tok; // not used.
 		} else if (tok->GetCategory() == Token::kComment) {
 			// throw away comment.
-			std::cout << "tossing comment: '" << tok->GetLexeme() << "'" << std::endl;
 		} else if (tok->GetCategory() == Token::kError) {
 			// print error, attempt recovery (via ignoring).
 			std::cout << "Error: " << tok->GetLexeme() << std::endl;
 		} else {
-			static_cast<ParentNode *>(path.back())->Put(NodeFactory::GetInstance()->CreateNode(tok, constant));
+			NodeInterface *node;
+			if (tok->GetCategory() == Token::kIdent) {
+				node = new IdentNode(tok, constant);
+			} else if (tok->GetCategory() == Token::kNum) {
+				node = new NumNode(tok);
+			} else if (tok->GetCategory() == Token::kString) {
+				node = new StringNode(tok);
+			} else {
+				std::stringstream s;
+				s << "Unknown token type '" << tok->String() << "'";
+				node = new ErrorNode(s.str());
+			}
+			static_cast<ParentNode *>(path.back())->Put(node);
 		}
 	}
 

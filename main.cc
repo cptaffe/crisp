@@ -25,6 +25,7 @@ int main() {
 		crisp::Token *tok;
 		while (chan->Get(&tok)) {
 			p->Put(tok);
+			delete tok;
 		}
 	}, &p, &chan);
 
@@ -47,5 +48,5 @@ int main() {
 		std::cout << ">> " << node->PPrint() << std::endl;
 	}
 
-	std::cout << exec.GetSymbolTable().PPrint();
+	std::cout << exec.symbol_table().PPrint();
 }
