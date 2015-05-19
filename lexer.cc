@@ -122,11 +122,10 @@ StateInterface *String::Next() {
 	char c = s->scanner->Next();
 	char delim = c; // " or '
 	s->pos = s->scanner->pos();
-	// lex "stuff"
-	do {
+	// lex "stuff" sans ""
+	while ((c = s->scanner->Next()) != delim) {
 		s->buf.push_back(c);
-	} while ((c = s->scanner->Next()) != delim);
-	s->buf.push_back(c); // save end '"'
+	}
 	s->toks.push(new Token(Token::kString, s->pos, s->buf));
 	s->buf.clear();
 	return next;

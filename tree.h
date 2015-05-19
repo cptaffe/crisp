@@ -14,16 +14,73 @@
 
 namespace crisp {
 
-class NodeInterface {
+class Node {
 public:
-	virtual ~NodeInterface() {}
+	virtual ~Node() {}
+
+	class State {
+	public:
+		State();
+
+		class SymbolTable {
+		public:
+			SymbolTable() = default;
+			SymbolTable(const SymbolTable& s) {
+				table = s.table;
+			}
+
+			void Put(std::string str, Node *node) {
+				table[str] = node;
+			}
+
+			Node *Get(std::string str) {
+				try {
+					return table.at(str);
+				} catch (...) {
+					return nullptr;
+				}
+			}
+
+			std::string PPrint() const {
+				std::string s;
+				for (auto i = table.begin(); i != table.end(); i++) {
+					if (i != table.begin()) {
+						s += " ";
+					}
+					s += (*i).first + ": ";
+					if ((*i).second != nullptr) {
+						s += (*i).second->PPrint();
+					} else {
+						s += "null";
+					}
+					s += '\n';
+				}
+				return s;
+			}
+
+		private:
+			std::map<std::string, Node *> table;
+		};
+
+		State(SymbolTable s) : symbol_table_(s) {}
+
+		SymbolTable& symbol_table() {
+			return symbol_table_;
+		}
+
+	private:
+		SymbolTable symbol_table_;
+	};
 
 	// prints a pretty printed representation of this
 	// node and its child nodes to an ostream.
 	virtual std::string PPrint() const = 0;
 
+	// returns the result of evaluating itself
+	virtual Node *Eval(State *state) const = 0;
+
 	// Category, each pertaining to its class.
-	// Use this to cast appropriately from NodeInterface.
+	// Use this to cast appropriately from Node.
 	enum Category {
 		kRoot,
 		kList,
@@ -33,6 +90,7 @@ public:
 		kError,
 		kCallable,
 		kNull,
+		kConst,
 		kOther
 	};
 
@@ -40,8 +98,12 @@ public:
 	virtual enum Category category() const = 0;
 };
 
-class NullNode : public NodeInterface {
+class NullNode : public Node {
 public:
+	virtual Node *Eval(State *state) const {
+		return const_cast<NullNode *>(this); // evalutate to self
+	}
+
 	virtual std::string PPrint() const {
 		// an empty list is considered null.
 		return "()";
@@ -52,25 +114,49 @@ public:
 	}
 };
 
-class ParentNode : public NodeInterface {
+class ParentNodeInterface : public Node {
 public:
-	ParentNode(bool constant = false) {}
-	virtual void Put(NodeInterface *node) = 0;
-
-	virtual std::vector<NodeInterface *>::iterator Begin() {
-		return children.begin();
-	}
-
-	virtual std::vector<NodeInterface *>::iterator End() {
-		return children.end();
-	}
-protected:
-	std::vector<NodeInterface *> children;
+	virtual void Put(Node *node) = 0;
 };
 
-class CallableNode : public NodeInterface {
+class ParentNode : public ParentNodeInterface {
 public:
-	virtual NodeInterface *Call(std::vector<NodeInterface *>& params) = 0;
+	virtual void Put(Node *node) {
+		children_.push_back(node);
+	}
+protected:
+	std::vector<Node *> children_;
+};
+
+class ConstNode : public ParentNode {
+public:
+
+	virtual Node *Eval(State *state) const {
+		return child; // remove one layer of const-ness
+	}
+
+	virtual std::string PPrint() const {
+		return std::string("'") + child->PPrint();
+	}
+
+	virtual enum Category category() const {
+		return kConst;
+	}
+
+	virtual void Put(Node *node) {
+		child = node;
+	}
+private:
+	Node *child;
+};
+
+class CallableNode : public Node {
+public:
+	virtual Node *Eval(State *state) const {
+		return const_cast<CallableNode *>(this); // callable nodes evaluate to themselves.
+	}
+
+	virtual Node *Call(std::vector<Node *>& params) = 0;
 
 	virtual enum Category category() const {
 		return kCallable;
@@ -78,23 +164,31 @@ public:
 };
 
 class RootNode : public ParentNode {
-	virtual void Put(NodeInterface *node) {
-		children.push_back(node);
+	virtual Node *Eval(State *state) const {
+		RootNode *root = new RootNode(); // copy self
+		for (auto i = children_.begin(); i != children_.end(); i++) {
+			root->Put((*i)->Eval(state));
+		}
+		return root;
+	}
+
+	virtual void Put(Node *node) {
+		children_.push_back(node);
 	}
 
 	virtual std::string PPrint() const {
-		std::stringstream os;
-		for (auto i = children.begin(); i != children.end(); i++) {
-			if (*i != nullptr) {
-				os << (*i)->PPrint();
-			} else {
-				os << "null";
+		std::string s;
+		for (auto i = children_.begin(); i != children_.end(); i++) {
+			if (i != children_.begin()) {
+				s += " ";
 			}
-			if ((i + 1) != children.end()) {
-				os << " ";
+			if (*i != nullptr) {
+				s += (*i)->PPrint();
+			} else {
+				s += "null";
 			}
 		}
-		return os.str();
+		return s;
 	}
 
 	virtual enum Category category() const {
@@ -104,59 +198,72 @@ class RootNode : public ParentNode {
 
 class ListNode : public ParentNode {
 public:
-	ListNode(Token *tok, bool con = false) : constant_(con) {}
+	ListNode(Token *tok, bool con = false) {}
 
-	virtual void Put(NodeInterface *node) {
-		children.push_back(node);
+	virtual Node *Eval(State *state) const;
+
+	virtual void Put(Node *node) {
+		children_.push_back(node);
 	}
 
 	virtual std::string PPrint() const {
-		std::stringstream os;
-		if (constant_) {
-			os << "\'";
-		}
-		os << "(";
-		for (auto i = children.begin(); i != children.end(); i++) {
+		std::string s;
+		s += "(";
+		for (auto i = children_.begin(); i != children_.end(); i++) {
+			if (i != children_.begin()) {
+				s += " ";
+			}
 			if (*i != nullptr) {
-				os << (*i)->PPrint();
+				s += (*i)->PPrint();
 			} else {
-				os << "null";
-			}
-			if ((i + 1) != children.end()) {
-				os << " ";
+				s += "null";
 			}
 		}
-		os << ")";
-		return os.str();
+		s += ")";
+		return s;
+	}
+
+	std::vector<Node *> children() const {
+		return children_;
 	}
 
 	virtual enum Category category() const {
 		return kList;
 	}
+};
 
-	virtual bool constant() const {
-		return constant_;
+class ErrorNode : public Node {
+public:
+	ErrorNode(std::string msg) : msg_(msg) {}
+
+	virtual Node *Eval(State *state) const {
+		return const_cast<ErrorNode *>(this); // error nodes evaluate to themselves
+	}
+
+	virtual std::string PPrint() const {
+		return std::string("Error: ") + msg_;
+	}
+
+	virtual enum Category category() const {
+		return kError;
 	}
 
 private:
-	const bool constant_;
+	std::string msg_;
 };
 
-class IdentNode : public NodeInterface {
+class IdentNode : public Node {
 public:
-	IdentNode(Token *tok, bool con = false) : constant_(con), str_(tok->GetLexeme()) {}
+	IdentNode(Token *tok) : str_(tok->GetLexeme()) {}
 
-	virtual std::string PPrint() const {
-		std::stringstream os;
-		if (constant_) {
-			os << "\'";
-		}
-		os << str();
-		return os.str();
+	virtual Node *Eval(State *state) const {
+		// lookup in symbol table
+		Node *def = state->symbol_table().Get(str_);
+		return def ? def->Eval(state) : new ErrorNode(std::string("variable '") + str() + "' is undefined");
 	}
 
-	virtual bool constant() const {
-		return constant_;
+	virtual std::string PPrint() const {
+		return str();
 	}
 
 	virtual enum Category category() const {
@@ -169,10 +276,9 @@ public:
 
 private:
 	std::string str_;
-	const bool constant_;
 };
 
-class NumNode : public NodeInterface {
+class NumNode : public Node {
 public:
 	NumNode(Token *tok) : num([&]{
 		// crappy number conversion
@@ -182,6 +288,10 @@ public:
 		s >> n;
 		return n;
 	}()) {}
+
+	virtual Node *Eval(State *state) const {
+		return const_cast<NumNode *>(this); // num nodes evaluate to themselves
+	}
 
 	virtual std::string PPrint() const {
 		std::stringstream os;
@@ -197,14 +307,16 @@ private:
 	int num;
 };
 
-class StringNode : public NodeInterface {
+class StringNode : public Node {
 public:
 	StringNode(Token *tok) : str_(tok->GetLexeme()) {}
 
+	virtual Node *Eval(State *state) const {
+		return const_cast<StringNode *>(this); // string nodes evaluate to themselves
+	}
+
 	virtual std::string PPrint() const {
-		std::stringstream os;
-		os << "\"" << str() << "\"";
-		return os.str();
+		return std::string("\"") + str() + "\"";
 	}
 
 	virtual enum Category category() const {
@@ -218,86 +330,52 @@ private:
 	std::string str_;
 };
 
-class ErrorNode : public NodeInterface {
+// Callable nodes.
+
+// (def name thing)
+class Define : public CallableNode {
 public:
-	ErrorNode(std::string msg) : msg_(msg) {}
+	Define(Node::State::SymbolTable& t);
+	virtual std::string PPrint() const;
+	virtual Node *Call(std::vector<Node *>& params);
+private:
+	Node::State::SymbolTable& table;
+};
+
+class LambdaInstance : public CallableNode {
+public:
+	LambdaInstance(Node::State::SymbolTable& t, ListNode *f, Node *body);
+	virtual std::string PPrint() const;
+	virtual Node *Call(std::vector<Node *>& params);
+private:
+	Node::State::SymbolTable& table;
+	ListNode *func;
+	Node *func_body;
+};
+
+class Lambda : public CallableNode {
+public:
+	Lambda(Node::State::SymbolTable& t) : table(t) {}
 
 	virtual std::string PPrint() const {
-		std::stringstream os;
-		os << "Error{" << msg_ << "}";
-		return os.str();
+		return "Builtin<Lambda>";
 	}
 
-	virtual enum Category category() const {
-		return kError;
-	}
-
-private:
-	std::string msg_;
-};
-
-// returns specific class instantiations for non-list nodes.
-class NodeFactory {
-public:
-	static NodeFactory *GetInstance() { return &NodeFactory_; }
-
-	NodeInterface *CreateNode(Token *tok, bool constant) {
-		if (tok->GetCategory() == Token::kIdent) {
-			return new IdentNode(tok, constant);
-		} else if (tok->GetCategory() == Token::kNum) {
-			return new NumNode(tok);
-		} else if (tok->GetCategory() == Token::kString) {
-			return new StringNode(tok);
-		} else {
-			std::stringstream s;
-			s << "Unknown token type '" << tok->String() << "'";
-			return new ErrorNode(s.str());
-		}
-	}
-private:
-	static NodeFactory NodeFactory_;
-};
-
-class SymbolTable {
-public:
-	SymbolTable() = default;
-	SymbolTable(const SymbolTable& s) {
-		table = s.table;
-	}
-
-	void Put(std::string str, NodeInterface *node) {
-		table[str] = node;
-	}
-
-	NodeInterface *Get(std::string str) {
-		try {
-			return table.at(str);
-		} catch (...) {
-			return nullptr;
-		}
-	}
-
-	std::string PPrint() const {
-		std::stringstream os;
-		for (auto i = table.begin(); i != table.end(); i++) {
-			os << (*i).first << ": ";
-			if ((*i).second != nullptr) {
-				os << (*i).second->PPrint();
+	virtual Node *Call(std::vector<Node *>& params) {
+		// this callable takes arguments to create a lambda,
+		// then returns another callable that executes the lambda.
+		if (params.size() == 2) {
+			if (params[0]->category() == Node::kList) {
+				return new LambdaInstance(table, static_cast<ListNode *>(params[0]), params[1]);
 			} else {
-				os << "null";
+				return new ErrorNode(std::string("Lambda: first atom must be  List, not '") + params[0]->PPrint() + "'");
 			}
-			auto j = i;
-			if (i++ != table.end()) {
-				os << " ";
-			}
-			i = j;
-			os << std::endl;
+		} else {
+			return new ErrorNode("Lambda: takes two atoms");
 		}
-		return os.str();
 	}
-
 private:
-	std::map<std::string, NodeInterface *> table;
+	Node::State::SymbolTable& table;
 };
 
 } // namespace crisp

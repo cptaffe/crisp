@@ -21,7 +21,6 @@
 				'scanner.cc',
 				'token.cc',
 				'tree.cc',
-				'pass.cc',
 			],
 			'include_dirs': [],
 		},

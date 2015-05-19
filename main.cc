@@ -2,7 +2,6 @@
 #include "lexer.h"
 #include "parser.h"
 #include "channel.h"
-#include "pass.h"
 
 #include <sstream>
 #include <future>
@@ -37,16 +36,12 @@ int main() {
 	lexf.wait();
 	parsef.wait();
 
-	crisp::NodeInterface *node = p.GetTree();
-
-	crisp::ExecutionState exec;
-	crisp::ExecutePass xpass(exec);
-
-	node = xpass.Apply(node);
+	crisp::Node::State e;
+	crisp::Node *node = p.GetTree()->Eval(&e);
 
 	if (node != nullptr) {
 		std::cout << ">> " << node->PPrint() << std::endl;
 	}
 
-	std::cout << exec.symbol_table().PPrint();
+	std::cout << e.symbol_table().PPrint();
 }
