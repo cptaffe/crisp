@@ -37,6 +37,8 @@ std::string Token::String() const {
 		return "Comment";
 	case Token::kError:
 		return "Error";
+	case Token::kPossibleBreak:
+		return "Possible Break";
 	}
 }
 

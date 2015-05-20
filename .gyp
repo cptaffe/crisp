@@ -21,6 +21,8 @@
 				'scanner.cc',
 				'token.cc',
 				'tree.cc',
+				'parser.cc',
+				'functions.cc',
 			],
 			'include_dirs': [],
 		},

@@ -9,9 +9,10 @@
 #include <sstream>
 #include <cctype>
 
-using namespace crisp;
+namespace crisp {
+namespace lexer {
 
-const std::string crisp::Ident::legal = "+-*/`~!@$%^&*_=|?\\;:<>,.";
+const std::string Ident::legal = "#+-*/`~!@$%^&*_=|?\\:<>,.";
 
 Lexer::Lexer(ScannerInterface *s) : mach(s) {}
 
@@ -97,10 +98,14 @@ StateInterface *SExpression::Next() {
 }
 
 StateInterface *Whitespace::Next() {
+	bool saw_newline = false;
 	char c = s->scanner->Next();
-	while (Is((c = s->scanner->Next()))) {
+	do {
 		// dump whitespace
-	}
+		if (c == '\n') {
+			saw_newline = true;
+		}
+	} while (Is((c = s->scanner->Next())));
 	s->scanner->Back(c);
 	return next;
 }
@@ -149,3 +154,6 @@ Token *StateMachine::Next() {
 Token *Lexer::Get() {
 	return mach.Next();
 }
+
+} // namespace lexer
+} // namespace crisp

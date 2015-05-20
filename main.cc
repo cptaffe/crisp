@@ -6,22 +6,24 @@
 #include <sstream>
 #include <future>
 
-int main() {
-	crisp::InputScanner scanner(&std::cin);
-	crisp::Lexer lex(&scanner);
-	crisp::Parser p;
-	crisp::Channel<crisp::Token *> chan(5);
+using namespace crisp;
 
-	auto lexf = std::async([](crisp::Lexer *lex, crisp::Channel<crisp::Token *> *chan){
-		crisp::Token *tok;
+int main() {
+	InputScanner scanner(&std::cin);
+	lexer::Lexer lex(&scanner);
+	parser::Parser p;
+	Channel<Token *> chan(5);
+
+	auto lexf = std::async([](lexer::Lexer *lex, Channel<Token *> *chan){
+		Token *tok;
 		while ((tok = lex->Get()) != nullptr) {
 			chan->Put(tok);
 		}
 		chan->Kill();
 	}, &lex, &chan);
 
-	auto parsef = std::async([](crisp::Parser *p, crisp::Channel<crisp::Token *> *chan){
-		crisp::Token *tok;
+	auto parsef = std::async([](parser::Parser *p, Channel<Token *> *chan){
+		Token *tok;
 		while (chan->Get(&tok)) {
 			p->Put(tok);
 			delete tok;
@@ -36,12 +38,12 @@ int main() {
 	lexf.wait();
 	parsef.wait();
 
-	crisp::Node::State e;
-	crisp::Node *node = p.GetTree()->Eval(&e);
+	Node::State e;
+	Node *node = p.GetTree()->Eval(&e);
 
 	if (node != nullptr) {
 		std::cout << ">> " << node->PPrint() << std::endl;
 	}
 
-	std::cout << e.symbol_table().PPrint();
+	std::cout << e.symbol_table()->PPrint();
 }

@@ -25,6 +25,7 @@ public:
 		kTick,
 		kComment,
 		kError,
+		kPossibleBreak,
 	};
 
 	Token(const enum TokenCategory c, const Position p, const std::string l);

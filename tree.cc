@@ -1,7 +1,82 @@
 
 #include "tree.h"
+#include "functions.h"
+#include <string>
 
 namespace crisp {
+
+Node::State::State() : symbol_table_(new Scope(nullptr)) {
+	symbol_table_->Put("def", new DefineFunc(this));
+	symbol_table_->Put("lambda", new LambdaFunc(this));
+	symbol_table_->Put("#t", new BooleanNode(true));
+	symbol_table_->Put("#f", new BooleanNode(false));
+	symbol_table_->Put("not", new NotFunc(this));
+	symbol_table_->Put("quote", new QuoteFunc(this));
+}
+
+std::string Scope::PPrint() const {
+	std::string s;
+	for (auto i = table.begin(); i != table.end(); i++) {
+		s += (*i).first + ": ";
+		if ((*i).second != nullptr) {
+			s += (*i).second->PPrint();
+		} else {
+			s += "null";
+		}
+		s += '\n';
+	}
+	return s;
+}
+
+bool Node::isTrue() {
+	// a node is true if it is not false.
+	auto b = dynamic_cast<const BooleanNode *>(this);
+	return b == nullptr || b->value() == true;
+}
+
+Node *NullNode::Eval(State *state) const {
+	return const_cast<NullNode *>(this); // evalutate to self
+}
+
+std::string NullNode::PPrint() const {
+	// an empty list is considered null.
+	return "()";
+}
+
+void ParentNode::Put(Node *node) {
+	children_.push_back(node);
+}
+
+std::string ConstNode::PPrint() const {
+	return std::string("'") + child->PPrint();
+}
+
+void ConstNode::Put(Node *node) {
+	child = node;
+}
+
+Node *CallableNode::Eval(State *state) const {
+	// callable nodes evaluate to themselves.
+	return const_cast<CallableNode *>(this);
+}
+
+Node *RootNode::Eval(State *state) const {
+	RootNode *root = new RootNode(); // copy self
+	for (auto i: children_) {
+		root->Put(i->Eval(state));
+	}
+	return root;
+}
+
+void RootNode::Put(Node *node) {
+	children_.push_back(node);
+}
+
+std::string RootNode::PPrint() const {
+	std::string s;
+	for (auto i: children_) { s += i->PPrint() + " "; }
+	return s;
+}
 
 Node *ListNode::Eval(State *state) const {
 	// list nodes attempt to call the first atom
@@ -9,20 +84,13 @@ Node *ListNode::Eval(State *state) const {
 	if (children_.begin() != children_.end()) {
 		// assure first atom is callable
 		Node *callNode = (*children_.begin())->Eval(state);
-		if (callNode->category() == Node::kCallable) {
-			// now create a vector of parameters.
-			std::vector<Node *> params;
-			for (auto i = children_.begin(); i != children_.end(); i++) {
-				// evaluate parameters once
-				if (i != children_.begin()) {
-					params.push_back((*i)->Eval(state));
-				}
-			}
-
+		if (dynamic_cast<CallableNode *>(callNode) != nullptr) {
 			// execute call
+			// create a vector of parameters.
+			std::vector<Node *> params(children_.begin() + 1, children_.end());
 			return static_cast<CallableNode *>(callNode)->Call(params);
 		} else {
-			return new ErrorNode(std::string("Active List: first atom must be Callable not '") + callNode->PPrint() + "'");
+			return new ErrorNode(std::string("List: first atom must be Callable not '") + callNode->PPrint() + "'");
 		}
 	} else {
 		// empty list evaluates to null.
@@ -30,60 +98,86 @@ Node *ListNode::Eval(State *state) const {
 	}
 }
 
-Node::State::State() {
-	symbol_table_.Put("def", new Define(symbol_table()));
-	symbol_table_.Put("lambda", new Lambda(symbol_table()));
+void ListNode::Put(Node *node) {
+	children_.push_back(node);
 }
 
-Define::Define(Node::State::SymbolTable& t) : table(t) {}
-
-std::string Define::PPrint() const {
-	return "Builtin<Define>";
-}
-
-Node *Define::Call(std::vector<Node *>& params) {
-	// add an entry to the symbol table.
-	std::string str = static_cast<IdentNode *>(params[0])->str();
-	table.Put(str, params[1]);
-	return params[0];
-}
-
-LambdaInstance::LambdaInstance(Node::State::SymbolTable& t, ListNode *f, Node *body) : table(t), func(f), func_body(body) {}
-
-std::string LambdaInstance::PPrint() const {
-	return "Builtin<Lambda-Instance>";
-}
-
-Node *LambdaInstance::Call(std::vector<Node *>& params) {
-	// localize data by creating a new symbol table.
-	Node::State::SymbolTable symb = table;
-
-	// Define these parameters against the ids in the
-	// call to Lambda's 1st parameter (the function definition list).
-	// ...
-	std::vector<Node *> children = func->children();
-
-	{
-		auto i = children.begin();
-		auto j = params.begin();
-		while (i != children.end() && j != params.end()) {
-			if ((*i)->category() == Node::kIdent) {
-				std::string str = static_cast<IdentNode *>(*i)->str();
-				symb.Put(str, *j); // add definition to local symbol table
-			} else {
-				return new ErrorNode("Function misdefinition, non-ident in parameters list");
-			}
-			i++; j++;
+std::string ListNode::PPrint() const {
+	std::string s;
+	s += "(";
+	for (auto i = children_.begin(); i != children_.end(); i++) {
+		if (i != children_.begin()) {
+			s += " ";
 		}
-
-		if (i == children.end() && j == params.end()) {
-			// execute func_body with new symbol table.
-			Node::State s(symb);
-			return func_body->Eval(&s);
+		if (*i != nullptr) {
+			s += (*i)->PPrint();
 		} else {
-			return new ErrorNode(std::string((i == children.end()) ? "Too many" : "Too few") + " arguments for function call");
+			s += "null";
 		}
 	}
+	s += ")";
+	return s;
+}
+
+ErrorNode::ErrorNode(std::string msg) : msg_(msg) {}
+
+Node *ErrorNode::Eval(State *state) const {
+	return const_cast<ErrorNode *>(this); // error nodes evaluate to themselves
+}
+
+std::string ErrorNode::PPrint() const {
+	return std::string("Error: ") + msg_;
+}
+
+IdentNode::IdentNode(std::string id) : str_(id) {}
+
+Node *IdentNode::Eval(State *state) const {
+	// lookup in symbol table
+	Node *def = state->symbol_table()->Get(str_);
+	return def == nullptr ? new ErrorNode(std::string("variable '") + str() + "' is undefined") : def->Eval(state);
+}
+
+std::string IdentNode::PPrint() const {
+	return str();
+}
+
+NumNode::NumNode(Token *tok) : num([&]{
+	// crappy number conversion
+	int n;
+	std::stringstream s;
+	s << tok->GetLexeme();
+	s >> n;
+	return n;
+}()) {}
+
+Node *NumNode::Eval(State *state) const {
+	return const_cast<NumNode *>(this); // num nodes evaluate to themselves
+}
+
+std::string NumNode::PPrint() const {
+	std::stringstream os;
+	os << num;
+	return os.str();
+}
+
+StringNode::StringNode(Token *tok) : str_(tok->GetLexeme()) {}
+
+Node *StringNode::Eval(State *state) const {
+	return const_cast<StringNode *>(this); // string nodes evaluate to themselves
+}
+
+std::string StringNode::PPrint() const {
+	return std::string("\"") + str() + "\"";
+}
+
+BooleanNode::BooleanNode(bool val) : value_(val) {}
+
+Node *BooleanNode::Eval(State *state) const {
+	return const_cast<BooleanNode *>(this); // boolean evaluates to itself
+}
+
+std::string BooleanNode::PPrint() const {
+	return value_ ? "#t" : "#f";
 }
 
 } // namespace

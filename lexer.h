@@ -8,10 +8,12 @@
 
 #include "token.h"
 #include "scanner.h"
+#include "state.h"
 
 #include <stack>
 
 namespace crisp {
+namespace lexer {
 
 class LexerInterface {
 public:
@@ -28,13 +30,6 @@ public:
 	std::string buf;
 	std::stack<Token *> toks;
 	ScannerInterface *scanner;
-};
-
-class StateInterface {
-public:
-	virtual ~StateInterface() {}
-	// run state and get next state.
-	virtual StateInterface *Next() = 0;
 };
 
 // Patterns:
@@ -142,7 +137,7 @@ public:
 
 	// initial comment character
 	static bool IsDelim(char c) {
-		return c == '#';
+		return c == ';';
 	}
 
 	virtual StateInterface *Next();
@@ -189,6 +184,7 @@ private:
 	StateMachine mach;
 };
 
+} // namespace lexer
 } // namespace crisp
 
 #endif // CRISP_LEXER_H_
