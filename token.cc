@@ -9,15 +9,15 @@ using namespace crisp;
 
 Token::Token(const enum TokenCategory c, const Position p, const std::string l) : category_(c), pos_(p), lexeme_(l) {}
 
-std::string Token::GetLexeme() const {
+std::string Token::lexeme() const {
 	return lexeme_;
 }
 
-enum Token::TokenCategory Token::GetCategory() const {
+enum Token::TokenCategory Token::category() const {
 	return category_;
 }
 
-std::string Token::String() const {
+std::string Token::str() const {
 	switch (category_) {
 	case Token::kBeginParen:
 		return "Begin Paren";
@@ -42,6 +42,6 @@ std::string Token::String() const {
 	}
 }
 
-Position Token::GetPosition() const {
+Position Token::pos() const {
 	return pos_;
 }

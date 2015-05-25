@@ -142,7 +142,7 @@ private:
 
 class NumNode : public Node {
 public:
-	NumNode(Token *tok);
+	NumNode(int n);
 	virtual Node *Eval(State *state) const;
 	virtual std::string PPrint() const;
 private:
@@ -151,7 +151,7 @@ private:
 
 class StringNode : public Node {
 public:
-	StringNode(Token *tok);
+	StringNode(std::string str);
 	virtual Node *Eval(State *state) const;
 	virtual std::string PPrint() const;
 	std::string str() const { return str_; }

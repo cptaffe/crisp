@@ -9,12 +9,21 @@ std::string DefineFunc::PPrint() const {
 
 Node *DefineFunc::Call(std::vector<Node *>& params) {
 	// add an entry to the symbol table.
-	std::string str = static_cast<IdentNode *>(params[0])->str();
-	state->symbol_table()->Put(str, params[1]);
-	return params[0];
+	if (params.size() == 2) {
+		auto id = dynamic_cast<IdentNode *>(params[0]);
+		if (id) {
+			std::string str = id->str();
+			state->symbol_table()->Put(str, params[1]);
+			return params[0];
+		} else {
+			return new ErrorNode(PPrint() + ": first argument must be identifier not '" + params[0]->PPrint() + "'");
+		}
+	} else {
+		return new ErrorNode(PPrint() + ": takes two arguments not " + std::to_string(params.size()));
+	}
 }
 
-LambdaFunc::Instance::Instance(Node::State::SymbolTableInterface *t, ListNode *f, Node *body) : table(t), func(f), func_body(body) {}
+LambdaFunc::Instance::Instance(Node::State::SymbolTableInterface *t, IdentNode *n, Node *expression) : table(t), name(n), exp(expression) {}
 
 std::string LambdaFunc::Instance::PPrint() const {
 	return "lambda";
@@ -27,35 +36,24 @@ Node *LambdaFunc::Instance::Call(std::vector<Node *>& params) {
 
 	// localize data by creating a new symbol table.
 	Node::State::SymbolTableInterface *symb = new Scope(table);
-	std::vector<Node *> children = func->children();
 
-	if (children.size() != params.size()) {
-		return new ErrorNode(std::string((params.size() > children.size()) ? "Too many" : "Too few") + " arguments for function call");
+	if (params.size() != 1) {
+		return new ErrorNode("lambdas accept one parameter");
 	}
 
-	auto i = children.begin();
-	auto j = params.begin();
-	while (i != children.end() && j != params.end()) {
-		if (dynamic_cast<IdentNode *>(*i)) {
-			std::string str = static_cast<IdentNode *>(*i)->str();
-			symb->Put(str, *j); // add definition to local symbol table
-		} else {
-			return new ErrorNode("Function misdefinition, non-ident in parameters list");
-		}
-		i++; j++;
-	}
+	symb->Put(name->str(), params[0]); // add definition to local symbol table
 
 	// execute func_body with new symbol table.
 	Node::State s(symb);
-	return func_body->Eval(&s);
+	return exp->Eval(&s);
 }
 
 Node *LambdaFunc::Call(std::vector<Node *>& params) {
 	// this callable takes arguments to create a lambda,
 	// then returns another callable that executes the lambda.
 	if (params.size() == 2) {
-		if (dynamic_cast<ListNode *>(params[0])) {
-			return new Instance(state->symbol_table(), static_cast<ListNode *>(params[0]), params[1]);
+		if (dynamic_cast<IdentNode *>(params[0])) {
+			return new Instance(state->symbol_table(), static_cast<IdentNode *>(params[0]), params[1]);
 		} else {
 			return new ErrorNode(std::string("Lambda: first atom must be List, not '") + params[0]->PPrint() + "'");
 		}

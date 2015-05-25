@@ -141,14 +141,7 @@ std::string IdentNode::PPrint() const {
 	return str();
 }
 
-NumNode::NumNode(Token *tok) : num([&]{
-	// crappy number conversion
-	int n;
-	std::stringstream s;
-	s << tok->GetLexeme();
-	s >> n;
-	return n;
-}()) {}
+NumNode::NumNode(int n) : num(n) {}
 
 Node *NumNode::Eval(State *state) const {
 	return const_cast<NumNode *>(this); // num nodes evaluate to themselves
@@ -160,7 +153,7 @@ std::string NumNode::PPrint() const {
 	return os.str();
 }
 
-StringNode::StringNode(Token *tok) : str_(tok->GetLexeme()) {}
+StringNode::StringNode(std::string str) : str_(str) {}
 
 Node *StringNode::Eval(State *state) const {
 	return const_cast<StringNode *>(this); // string nodes evaluate to themselves

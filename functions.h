@@ -27,13 +27,13 @@ public:
 
 	class Instance : public CallableNode {
 	public:
-		Instance(Node::State::SymbolTableInterface *t, ListNode *f, Node *body);
+		Instance(Node::State::SymbolTableInterface *t, IdentNode *n, Node *expression);
 		virtual std::string PPrint() const;
 		virtual Node *Call(std::vector<Node *>& params);
 	private:
 		Node::State::SymbolTableInterface *table;
-		ListNode *func;
-		Node *func_body;
+		IdentNode *name;
+		Node *exp;
 	};
 
 	virtual std::string PPrint() const { return "{lambda}"; }
