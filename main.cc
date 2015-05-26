@@ -17,6 +17,7 @@ int main() {
 	auto lexf = std::async(std::launch::async, [](lexer::Lexer *lex, Channel<Token *> *chan){
 		Token *tok;
 		while ((tok = lex->Get()) != nullptr) {
+			// put item in channel
 			chan->Put(tok);
 		}
 		chan->Kill();
@@ -25,6 +26,7 @@ int main() {
 	auto parsef = std::async(std::launch::async, [](parser::Parser *p, Channel<Token *> *chan){
 		Token *tok;
 		while (chan->Get(&tok)) {
+			// put item in channel
 			p->Put(tok);
 			delete tok;
 		}
